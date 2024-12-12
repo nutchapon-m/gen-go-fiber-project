@@ -98,7 +98,7 @@ type server struct {
 
 func NewApp(app *fiber.App) server {
 
-	app.Use(เ
+	app.Use(
 		middlewares.NewLoggerMiddleWare(),
 		middlewares.NewCorsMiddleWare(),
 	)
