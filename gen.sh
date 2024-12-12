@@ -316,6 +316,9 @@ EOF
 # .gitignore
 cat <<EOF > .gitignore
 **/config.y*ml
+**/gen.sh
+**/docker-compose.y*ml
+**/compose.y*ml
 EOF
 
 echo "Setup complete."
