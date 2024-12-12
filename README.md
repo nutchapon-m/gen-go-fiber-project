@@ -7,4 +7,5 @@ curl -L -o gen.sh "https://raw.githubusercontent.com/nutchapon-m/gen-go-fiber-pr
 - Then run
 ```bash
 bash gen.sh
+go run cmd/main.go
 ```
