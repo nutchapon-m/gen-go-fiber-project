@@ -1,22 +1,22 @@
 # Initialize Go module
 echo "Initializing Go module..."
+echo
 read -p "Enter project name: " PROJECT_NAME
+echo
 go mod init "$PROJECT_NAME"
-
+echo
 echo "Install Packages..."
 go get -u gorm.io/gorm
 go get go.uber.org/zap
 go get github.com/spf13/viper
 go get github.com/golang-jwt/jwt/v5
 go get github.com/gofiber/fiber/v2
-
+echo
 # Create directories
 echo "Creating directories..."
 mkdir -p cmd configs external/db internal/{core/{domains,services},handlers,pkgs/{errs,logs,utils},repositories} server/{middlewares,routes}
-
 # Create files and add content
 echo "Creating and populating files..."
-
 # main.go
 cat <<EOF > cmd/main.go
 package main
@@ -124,7 +124,6 @@ func (s server) ListenAndServ() {
 		s.app.Listen(":" + viper.GetString("server.port"))
 	}
 }
-
 EOF
 
 # logger.go
@@ -153,7 +152,6 @@ func NewLoggerMiddleWare() func(*fiber.Ctx) error {
 		DisableColors: false,
 	})
 }
-
 EOF
 
 # cors.go
@@ -322,5 +320,5 @@ cat <<EOF > .gitignore
 **/docker-compose.y*ml
 **/compose.y*ml
 EOF
-
+echo
 echo "Setup complete."
