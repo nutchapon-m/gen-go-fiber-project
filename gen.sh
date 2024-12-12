@@ -128,6 +128,8 @@ func (s server) ListenAndServ() {
 EOF
 
 # logger.go
+LOG_FORMAT="[ \${time} ] | \${status} | \${latency} | \${ip} | \${method} | \${path} | \${error}\\n"
+
 cat <<EOF > server/middlewares/log.go
 package middlewares
 
@@ -143,7 +145,7 @@ func NewLoggerMiddleWare() func(*fiber.Ctx) error {
 	return logger.New(logger.Config{
 		Next:          nil,
 		Done:          nil,
-		Format:        "[ ${time} ] | ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}\n",
+		Format:        "$LOG_FORMAT",
 		TimeFormat:    "2006-01-02 15:04:05",
 		TimeZone:      "Local",
 		TimeInterval:  500 * time.Millisecond,
