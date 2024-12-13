@@ -190,18 +190,28 @@ cat <<EOF > internal/pkgs/logs/logs.go
 package logs
 
 import (
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var log *zap.Logger
+var (
+	log    *zap.Logger
+	config zap.Config
+	err    error
+)
 
 func LogInit() {
-	config := zap.NewProductionConfig()
+	if viper.GetString("server.mode") == "debug" {
+		config = zap.NewDevelopmentConfig()
+	} else {
+		config = zap.NewProductionConfig()
+	}
+
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.StacktraceKey = ""
-	var err error
+
 	log, err = config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic(err)
