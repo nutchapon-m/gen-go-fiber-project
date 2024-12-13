@@ -127,7 +127,7 @@ func (s server) ListenAndServ() {
 EOF
 
 # logger.go
-LOG_FORMAT="[ \${time} ] | \${status} | \${latency} | \${ip} | \${method} | \${path} | \${error}\\n"
+LOG_FORMAT="[\${time}] | \${status} | \${latency} | \${ip} | \${method} | \${path} | \${error}\\n"
 
 cat <<EOF > server/middlewares/log.go
 package middlewares
