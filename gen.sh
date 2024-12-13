@@ -99,8 +99,8 @@ type server struct {
 func NewApp(app *fiber.App) server {
 
 	app.Use(
-		middlewares.NewLoggerMiddleWare(),
-		middlewares.NewCorsMiddleWare(),
+		middlewares.NewLoggerMiddleWare,
+		middlewares.NewCorsMiddleWare,
 	)
 
 	return server{app: app}
@@ -136,22 +136,19 @@ import (
 	"os"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-func NewLoggerMiddleWare() func(*fiber.Ctx) error {
-	return logger.New(logger.Config{
-		Next:          nil,
-		Done:          nil,
-		Format:        "$LOG_FORMAT",
-		TimeFormat:    "2006-01-02 15:04:05",
-		TimeZone:      "Local",
-		TimeInterval:  500 * time.Millisecond,
-		Output:        os.Stdout,
-		DisableColors: false,
-	})
-}
+var NewLoggerMiddleWare = logger.New(logger.Config{
+	Next:          nil,
+	Done:          nil,
+	Format:        "$LOG_FORMAT",
+	TimeFormat:    "2006-01-02 15:04:05",
+	TimeZone:      "Local",
+	TimeInterval:  500 * time.Millisecond,
+	Output:        os.Stdout,
+	DisableColors: false,
+})
 EOF
 
 # cors.go
@@ -165,24 +162,22 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-func NewCorsMiddleWare() func(*fiber.Ctx) error {
-	return cors.New(cors.Config{
-		Next:             nil,
-		AllowOriginsFunc: nil,
-		AllowOrigins:     "*",
-		AllowMethods: strings.Join([]string{
-			fiber.MethodGet,
-			fiber.MethodPost,
-			fiber.MethodPut,
-			fiber.MethodDelete,
-			fiber.MethodPatch,
-		}, ","),
-		AllowHeaders:     "",
-		AllowCredentials: false,
-		ExposeHeaders:    "",
-		MaxAge:           0,
-	})
-}
+var NewCorsMiddleWare = cors.New(cors.Config{
+	Next:             nil,
+	AllowOriginsFunc: nil,
+	AllowOrigins:     "*",
+	AllowMethods: strings.Join([]string{
+		fiber.MethodGet,
+		fiber.MethodPost,
+		fiber.MethodPut,
+		fiber.MethodDelete,
+		fiber.MethodPatch,
+	}, ","),
+	AllowHeaders:     "",
+	AllowCredentials: false,
+	ExposeHeaders:    "",
+	MaxAge:           0,
+})
 EOF
 
 # logs.go
