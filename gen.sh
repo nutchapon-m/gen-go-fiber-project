@@ -99,8 +99,8 @@ type server struct {
 func NewApp(app *fiber.App) server {
 
 	app.Use(
-		middlewares.NewLoggerMiddleWare,
-		middlewares.NewCorsMiddleWare,
+		middlewares.NewLoggerMiddleware,
+		middlewares.NewCorsMiddleware,
 	)
 
 	return server{app: app}
@@ -139,7 +139,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-var NewLoggerMiddleWare = logger.New(logger.Config{
+var NewLoggerMiddleware = logger.New(logger.Config{
 	Next:          nil,
 	Done:          nil,
 	Format:        "$LOG_FORMAT",
@@ -162,7 +162,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-var NewCorsMiddleWare = cors.New(cors.Config{
+var NewCorsMiddleware = cors.New(cors.Config{
 	Next:             nil,
 	AllowOriginsFunc: nil,
 	AllowOrigins:     "*",
