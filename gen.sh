@@ -14,19 +14,25 @@ go get github.com/gofiber/fiber/v2
 echo
 # Create directories
 echo "Creating directories..."
-mkdir -p cmd configs external/db internal/{core/{domains,services},handlers,pkgs/{errs,logs,utils},repositories} server/{middlewares,routes}
+mkdir -p cmd configs external/db internal/{core/{domains,services},handlers,pkgs/{errs,logs,utils},repositories} app/{middlewares,api}
 # Create files and add content
 echo "Creating and populating files..."
 # main.go
-cat <<EOF > cmd/main.go
+cat <<EOF > main.go
 package main
 
 import (
+	"$PROJECT_NAME/app/middlewares"
 	"$PROJECT_NAME/configs"
 	"$PROJECT_NAME/internal/pkgs/logs"
-	"$PROJECT_NAME/server"
+
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -35,8 +41,36 @@ func init() {
 }
 
 func main() {
-	app := server.NewApp(fiber.New())
-	app.ListenAndServ()
+	app := fiber.New(fiber.Config{
+		AppName: "atelnord",
+	})
+
+	app.Use(
+		middlewares.NewLoggerMiddleware,
+		middlewares.NewCorsMiddleware,
+	)
+	// Gracefully shutting down
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		serv := <-c
+		if serv.String() == "interrupt" {
+			fmt.Println("Gracefully shutting down...")
+			app.Shutdown()
+		}
+	}()
+
+	if viper.GetString("server.mode") == "debug" {
+		err := app.Listen("localhost:" + viper.GetString("server.port"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		err := app.Listen(":" + viper.GetString("server.port"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 EOF
 
@@ -78,58 +112,10 @@ func initTimeZone() {
 }
 EOF
 
-# server.go
-cat <<EOF > server/server.go
-package server
-
-import (
-	"fmt"
-	"$PROJECT_NAME/server/middlewares"
-	"os"
-	"os/signal"
-
-	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
-)
-
-type server struct {
-	app *fiber.App
-}
-
-func NewApp(app *fiber.App) server {
-
-	app.Use(
-		middlewares.NewLoggerMiddleware,
-		middlewares.NewCorsMiddleware,
-	)
-
-	return server{app: app}
-}
-
-func (s server) ListenAndServ() {
-	// Gracefully shutting down
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		serv := <-c
-		if serv.String() == "interrupt" {
-			fmt.Println("Gracefully shutting down...")
-			s.app.Shutdown()
-		}
-	}()
-
-	if viper.GetString("server.mode") == "debug" {
-		s.app.Listen("localhost:" + viper.GetString("server.port"))
-	} else {
-		s.app.Listen(":" + viper.GetString("server.port"))
-	}
-}
-EOF
-
 # logger.go
 LOG_FORMAT="[\${time}] | \${status} | \${latency} | \${ip} | \${method} | \${path} | \${error}\\n"
 
-cat <<EOF > server/middlewares/log.go
+cat <<EOF > app/middlewares/log.go
 package middlewares
 
 import (
@@ -152,7 +138,7 @@ var NewLoggerMiddleware = logger.New(logger.Config{
 EOF
 
 # cors.go
-cat <<EOF > server/middlewares/cors.go
+cat <<EOF > app/middlewares/cors.go
 package middlewares
 
 import (
