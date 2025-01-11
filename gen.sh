@@ -55,7 +55,7 @@ func main() {
 	go func() {
 		serv := <-c
 		if serv.String() == "interrupt" {
-			fmt.Println("Gracefully shutting down...")
+			fmt.Println("\nGracefully shutting down...")
 			app.Shutdown()
 		}
 	}()
