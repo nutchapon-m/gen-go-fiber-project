@@ -42,7 +42,7 @@ func init() {
 
 func main() {
 	app := fiber.New(fiber.Config{
-		AppName: "atelnord",
+		AppName: "$PROJECT_NAME",
 	})
 
 	app.Use(
