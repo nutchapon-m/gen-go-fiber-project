@@ -14,7 +14,7 @@ go get github.com/gofiber/fiber/v2
 echo
 # Create directories
 echo "Creating directories..."
-mkdir -p cmd configs external/db internal/{core/{domains,services},handlers,pkgs/{errs,logs,utils},repositories} app/{middlewares,api}
+mkdir -p configs internal/{domains,services,handlers,repositories} pkgs/{errs,logs,utils} server/{middlewares,routes}
 # Create files and add content
 echo "Creating and populating files..."
 # main.go
@@ -22,10 +22,9 @@ cat <<EOF > main.go
 package main
 
 import (
-	"$PROJECT_NAME/app/middlewares"
 	"$PROJECT_NAME/configs"
-	"$PROJECT_NAME/internal/pkgs/logs"
-
+	"$PROJECT_NAME/pkgs/logs"
+	"$PROJECT_NAME/server/routes"
 	"fmt"
 	"log"
 	"os"
@@ -35,8 +34,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+var addr string
+
 func init() {
-	configs.Init()
+	configs.InitConfigLoader()
+	configs.InitTimeZone()
 	logs.LogInit()
 }
 
@@ -45,10 +47,8 @@ func main() {
 		AppName: "$PROJECT_NAME",
 	})
 
-	app.Use(
-		middlewares.NewLoggerMiddleware,
-		middlewares.NewCorsMiddleware,
-	)
+	routes.RegisterRoutes(app)
+
 	// Gracefully shutting down
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -61,16 +61,25 @@ func main() {
 	}()
 
 	if viper.GetString("server.mode") == "debug" {
-		err := app.Listen("localhost:" + viper.GetString("server.port"))
-		if err != nil {
-			log.Fatal(err)
-		}
+		addr = "localhost:" + viper.GetString("server.port")
 	} else {
-		err := app.Listen(":" + viper.GetString("server.port"))
-		if err != nil {
-			log.Fatal(err)
-		}
+		addr = ":" + viper.GetString("server.port")
 	}
+
+	if err := app.Listen(addr); err != nil {
+		log.Fatal(err)
+	}
+}
+EOF
+
+# routes.go
+cat <<EOF > server/routes/routes.go
+package routes
+
+import "github.com/gofiber/fiber/v2"
+
+func RegisterRoutes(app *fiber.App) {
+	// Grouping router
 }
 EOF
 
@@ -79,43 +88,101 @@ cat <<EOF > configs/configs.go
 package configs
 
 import (
-    "fmt"
-    "os"
-    "strings"
-    "time"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-    "github.com/spf13/viper"
+	"github.com/spf13/viper"
 )
 
-func Init() {
-    initConfigLoader()
-    initTimeZone()
+func InitConfigLoader() {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	viper.ReadInConfig()
 }
 
-func initConfigLoader() {
-    viper.SetConfigName("config")
-    viper.SetConfigType("yml")
-    viper.AddConfigPath(".")
-    viper.AutomaticEnv()
-    viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-    viper.ReadInConfig()
+func InitTimeZone() {
+	ict, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	time.Local = ict
 }
+EOF
 
-func initTimeZone() {
-    ict, err := time.LoadLocation("Asia/Bangkok")
-    if err != nil {
-    fmt.Printf("Error: %v\n", err)
-    os.Exit(1)
-    }
-    time.Local = ict
+# internal/handlers/utils.go
+cat <<EOF > internal/handlers/utils.go
+package handlers
+
+import (
+	"$PROJECT_NAME/pkgs/errs"
+	"fmt"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+func handleError(c *fiber.Ctx, err error) error {
+	switch e := err.(type) {
+	case errs.AppError:
+		fmt.Fprintln(c, e)
+		return c.SendStatus(e.Code)
+	case error:
+		fmt.Fprintln(c, e)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	return nil
+}
+EOF
+
+# internal/services/utils.go
+cat <<EOF > internal/services/utils.go
+package services
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func mapStructFields(src interface{}, dest interface{}) error {
+	srcValue := reflect.ValueOf(src)
+	destValue := reflect.ValueOf(dest)
+
+	// Ensure src is a struct and dest is a pointer to a struct
+	if srcValue.Kind() != reflect.Struct {
+		return fmt.Errorf("source must be a struct")
+	}
+	if destValue.Kind() != reflect.Ptr || destValue.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("destination must be a pointer to a struct")
+	}
+
+	destElem := destValue.Elem()
+
+	// Iterate over source fields
+	for i := 0; i < srcValue.NumField(); i++ {
+		srcField := srcValue.Type().Field(i) // Get the field metadata
+		srcFieldName := srcField.Name
+		srcFieldValue := srcValue.Field(i)
+
+		// Find matching field in the destination
+		destField := destElem.FieldByName(srcFieldName)
+		if destField.IsValid() && destField.CanSet() && destField.Type() == srcFieldValue.Type() {
+			destField.Set(srcFieldValue)
+		}
+	}
+	return nil
 }
 EOF
 
 # logger.go
 LOG_FORMAT="[\${time}] | \${status} | \${latency} | \${ip} | \${method} | \${path} | \${error}\\n"
 
-cat <<EOF > app/middlewares/log.go
+cat <<EOF > server/middlewares/log.go
 package middlewares
 
 import (
@@ -138,7 +205,7 @@ var NewLoggerMiddleware = logger.New(logger.Config{
 EOF
 
 # cors.go
-cat <<EOF > app/middlewares/cors.go
+cat <<EOF > server/middlewares/cors.go
 package middlewares
 
 import (
@@ -167,7 +234,7 @@ var NewCorsMiddleware = cors.New(cors.Config{
 EOF
 
 # logs.go
-cat <<EOF > internal/pkgs/logs/logs.go
+cat <<EOF > pkgs/logs/logs.go
 package logs
 
 import (
@@ -217,7 +284,7 @@ func Error(message interface{}, field ...zapcore.Field) {
 EOF
 
 # errs.go
-cat <<EOF > internal/pkgs/errs/errs.go
+cat <<EOF > pkgs/errs/errs.go
 package errs
 
 import "github.com/gofiber/fiber/v2"
@@ -284,6 +351,52 @@ func NewValidateError(msg string) error {
 	return AppError{
 		Code:    fiber.ErrBadRequest.Code,
 		Message: msg,
+	}
+}
+EOF
+
+# pkgs/utils/builder.go
+cat <<EOF > pkgs/utils/builder.go
+package utils
+
+import (
+	"fmt"
+
+	"github.com/spf13/viper"
+)
+
+func URLBuilder(connType string) string {
+	switch connType {
+	case "server":
+		addr := ""
+		if viper.GetString("server.mode") == "debug" {
+			addr = "localhost:" + viper.GetString("server.port")
+		} else {
+			addr = ":" + viper.GetString("server.port")
+		}
+		return addr
+
+	case "postgres":
+		return fmt.Sprintf(
+			"host=%v user=%v password=%v dbname=%v port=%v sslmode=disable TimeZone=Asia/Bangkok",
+			viper.GetString("db.host"),
+			viper.GetString("db.user"),
+			viper.GetString("db.password"),
+			viper.GetString("db.name"),
+			viper.GetInt("db.port"),
+		)
+
+	case "mysql":
+		return fmt.Sprintf(
+			"%v:%v@tcp(%v:%v)/%v?charset=utf8&parseTime=True",
+			viper.GetString("db.username"),
+			viper.GetString("db.password"),
+			viper.GetString("db.host"),
+			viper.GetInt("db.port"),
+			viper.GetString("db.dbname"),
+		)
+	default:
+		return ""
 	}
 }
 EOF
