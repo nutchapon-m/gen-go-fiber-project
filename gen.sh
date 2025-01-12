@@ -24,6 +24,7 @@ package main
 import (
 	"$PROJECT_NAME/configs"
 	"$PROJECT_NAME/pkgs/logs"
+	"$PROJECT_NAME/pkgs/utils"
 	"$PROJECT_NAME/server/routes"
 	"fmt"
 	"log"
@@ -31,10 +32,7 @@ import (
 	"os/signal"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
 )
-
-var addr string
 
 func init() {
 	configs.InitConfigLoader()
@@ -60,11 +58,7 @@ func main() {
 		}
 	}()
 
-	if viper.GetString("server.mode") == "debug" {
-		addr = "localhost:" + viper.GetString("server.port")
-	} else {
-		addr = ":" + viper.GetString("server.port")
-	}
+	addr := utils.URLBuilder("server")
 
 	if err := app.Listen(addr); err != nil {
 		log.Fatal(err)
