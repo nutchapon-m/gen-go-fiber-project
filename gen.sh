@@ -14,7 +14,7 @@ go get github.com/gofiber/fiber/v2
 echo
 # Create directories
 echo "Creating directories..."
-mkdir -p configs internal/{domains,services,handlers,repositories} pkgs/{errs,logs,utils} server/{middlewares,routes}
+mkdir -p configs internal/{domains,services,handlers,repositories} pkgs/{errs,logs,builderutil,cryptoutil,jwtutil} server/{middlewares,routes}
 # Create files and add content
 echo "Creating and populating files..."
 # main.go
@@ -23,8 +23,8 @@ package main
 
 import (
 	"$PROJECT_NAME/configs"
+	"$PROJECT_NAME/pkgs/builderutil"
 	"$PROJECT_NAME/pkgs/logs"
-	"$PROJECT_NAME/pkgs/utils"
 	"$PROJECT_NAME/server/routes"
 	"fmt"
 	"log"
@@ -42,7 +42,7 @@ func init() {
 
 func main() {
 	app := fiber.New(fiber.Config{
-		AppName: "$PROJECT_NAME",
+		AppName: "bookshop",
 	})
 
 	routes.RegisterRoutes(app)
@@ -58,7 +58,7 @@ func main() {
 		}
 	}()
 
-	addr := utils.URLBuilder("server")
+	addr := builderutil.URLBuilder("server")
 
 	if err := app.Listen(addr); err != nil {
 		log.Fatal(err)
@@ -349,9 +349,9 @@ func NewValidateError(msg string) error {
 }
 EOF
 
-# pkgs/utils/builder.go
-cat <<EOF > pkgs/utils/builder.go
-package utils
+# pkgs/builder/builder.go
+cat <<EOF > pkgs/builderutil/url.go
+package builderutil
 
 import (
 	"fmt"
@@ -392,6 +392,78 @@ func URLBuilder(connType string) string {
 	default:
 		return ""
 	}
+}
+EOF
+
+# pkgs/crypto/jwt.go
+cat <<EOF > pkgs/jwtutil/jwt.go
+package jwtutil
+
+import (
+	"$PROJECT_NAME/pkgs/errs"
+	"$PROJECT_NAME/pkgs/logs"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/spf13/viper"
+)
+
+func GenerateJWT(payload jwt.MapClaims, expire time.Time) (string, error) {
+	secretToken := viper.GetString("secret.token")
+
+	payload["exp"] = expire.Unix()
+	atClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)
+
+	token, err := atClaims.SignedString([]byte(secretToken))
+	if err != nil {
+		logs.Error(err)
+		return "", errs.NewUnexpectedError("Unexpected Server Error")
+	}
+	return token, nil
+}
+
+type claims struct {
+	UserID int \`json:"user_id"\`
+	jwt.RegisteredClaims
+}
+
+func VerifyJWT(token string) (*claims, error) {
+	secretToken := viper.GetString("secret.token")
+
+	Claims := claims{}
+	jwtToken, err := jwt.ParseWithClaims(token, &Claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(secretToken), nil
+	})
+	if err != nil {
+		return nil, err
+	} else if !jwtToken.Valid {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+
+	return &Claims, nil
+}
+EOF
+
+# pkgs/crypto/jwt.go
+cat <<EOF > pkgs/cryptoutil/password.go
+package cryptoutil
+
+import (
+	"golang.org/x/crypto/bcrypt"
+)
+
+func HashPassword(pwd string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	// Compare the hashed password and the plaintext password
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 EOF
 
